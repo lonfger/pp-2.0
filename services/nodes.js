@@ -23,7 +23,7 @@ async function fetchBaseUrl(fallbackUrl) {
 }
 
 // Function to fetch a URL with retry logic
-async function fetchWithRetry(url, options = {}, retries = 50, delay = Math.floor(Math.random() * 1000)) {
+async function fetchWithRetry(url, options = {}, retries = 50, delay = Math.floor(Math.random() * 10000)) {
     logger(`Fetching URL with retry logic: ${url}`);
     for (let attempt = 0; attempt < retries; attempt++) {
         try {
