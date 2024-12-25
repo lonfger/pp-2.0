@@ -5,9 +5,16 @@ const { logger } = require("../utils/logger");
 
 // Function to fetch the base URL
 async function fetchBaseUrl(fallbackUrl) {
+  const proxies = await loadProxies()
+  const agent = new HttpsProxyAgent(proxies[Math.floor(Math.random() * array.length)])
   logger('Fetching base URL...');
     try {
-        const response = await fetchWithRetry('https://pipe-network-backend.pipecanary.workers.dev/api/getBaseUrl');
+        const response = await fetchWithRetry('https://pipe-network-backend.pipecanary.workers.dev/api/getBaseUrl', {
+          method: 'GET',
+          rejectUnauthorized: false,
+          secureProxy: false,
+          agent,
+        });
         if (!response.ok) throw new Error(`Failed to fetch base URL with status ${response.status}`);
         const data = await response.json();
         logger('Fetched base URL successfully:', 'info', data.baseUrl);
