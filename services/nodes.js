@@ -1,5 +1,5 @@
 const fetch = require("node-fetch");
-const { readToken, loadProxies, headers } = require("../utils/file");
+const { readToken, loadProxies } = require("../utils/file");
 const { HttpsProxyAgent } = require("https-proxy-agent");
 const { logger } = require("../utils/logger");
 
@@ -56,15 +56,17 @@ async function runNodeTests(API_BASE) {
         }
 
         for (let j = 0; j < tokens.length; j++) {
-            const { token, username } = tokens[j];
+            const { token, username, headers } = tokens[j];
             const proxy = proxies[j % proxies.length];
             const agent = new HttpsProxyAgent(proxy);
+
 
             logger(`Fetching nodes for ${username} using proxy: ${proxy}`, "info");
 
             const response = await fetch(`${API_BASE}/api/nodes`, {
+                method: "GET",
                 headers: {
-                    ...headers,
+                    ...JSON.parse(headers),
                     "authorization": `Bearer ${token}`,
                 },
                 agent,
@@ -75,10 +77,10 @@ async function runNodeTests(API_BASE) {
 
             for (const node of nodes) {
                 logger(`Testing node ${node.node_id} using proxy: ${proxy}`, "info");
-                const latency = await testNodeLatency(node, agent);
+                const latency = await testNodeLatency(node, agent, JSON.parse(headers));
 
                 logger(`Node ${node.node_id} (${node.ip}) latency: ${latency}ms`, latency > 0 ? "success" : "warn");
-                await reportTestResult(node, latency, token, agent, username, API_BASE);
+                await reportTestResult(node, latency, token, agent, username, API_BASE, JSON.parse(headers));
             }
         }
 
@@ -89,13 +91,13 @@ async function runNodeTests(API_BASE) {
 }
 
 // Function to test node latency
-async function testNodeLatency(node, agent) {
+async function testNodeLatency(node, agent, headers) {
     const start = Date.now();
     const timeout = 5000;
 
     try {
         await Promise.race([
-            fetch(`http://${node.ip}`, { agent, mode: "no-cors" }),
+            fetch(`http://${node.ip}`, { headers, agent, mode: "no-cors" }),
             new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), timeout)),
         ]);
         return Date.now() - start;
@@ -106,7 +108,7 @@ async function testNodeLatency(node, agent) {
 }
 
 // Function to report test result
-async function reportTestResult(node, latency, token, agent, username, API_BASE) {
+async function reportTestResult(node, latency, token, agent, username, API_BASE, headers) {
     if (!token) {
         logger("No token found. Skipping result reporting.", "warn");
         return;
@@ -116,8 +118,7 @@ async function reportTestResult(node, latency, token, agent, username, API_BASE)
         const response = await fetch(`${API_BASE}/api/test`, {
             method: "POST",
             headers: {
-                ...headers,
-                "Content-Type": "application/json",
+              ...headers,
                 Authorization: `Bearer ${token}`
             },
             body: JSON.stringify({

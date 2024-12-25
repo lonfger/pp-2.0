@@ -1,15 +1,14 @@
 const fetch = require("node-fetch");
 const { HttpsProxyAgent } = require("https-proxy-agent");
-const { readToken, loadProxies, headers } = require("../utils/file");
+const { readToken, loadProxies } = require("../utils/file");
 const { logger } = require("../utils/logger");
 
 // Fetch points for a user
-async function fetchPoints(token, username, agent, API_BASE) {
+async function fetchPoints(token, username, agent, API_BASE, headers) {
     try {
         const response = await fetch(`${API_BASE}/api/points`, {
             headers: {
                 ...headers,
-                "content-type": "application/json",
                 "authorization": `Bearer ${token}`,
             },
             agent,
@@ -41,7 +40,7 @@ async function sendHeartbeat(API_BASE) {
     }
 
     for (let i = 0; i < tokens.length; i++) {
-        const { token, username } = tokens[i];
+        const { token, username, headers } = tokens[i];
         const proxy = proxies[i % proxies.length];
         const agent = new HttpsProxyAgent(proxy);
 
@@ -52,8 +51,7 @@ async function sendHeartbeat(API_BASE) {
             const response = await fetch(`${API_BASE}/api/heartbeat`, {
                 method: "POST",
                 headers: {
-                    ...headers,
-                    "content-type": "application/json",
+                    ...JSON.parse(headers),
                     "authorization": `Bearer ${token}`,
                 },
                 body: JSON.stringify({
@@ -66,11 +64,11 @@ async function sendHeartbeat(API_BASE) {
 
             if (response.ok) {
                 logger(`Heartbeat sent successfully for ${username} using proxy: ${proxy}`, "success");
-                await fetchPoints(token, username, agent, API_BASE);
+                await fetchPoints(token, username, agent, API_BASE, JSON.parse(headers));
             } else {
                 const errorText = await response.text();
                 logger(`Failed to send heartbeat for ${username}: ${errorText}`, "error");
-                await fetchPoints(token, username, agent, API_BASE);
+                await fetchPoints(token, username, agent, API_BASE, JSON.parse(headers));
             }
         } catch (error) {
             logger(`Error sending heartbeat for ${username}: ${error.message}`, "error");
@@ -81,7 +79,8 @@ async function sendHeartbeat(API_BASE) {
 // Fetch IP and Geo-location data
 async function getGeoLocation(agent) {
     try {
-        const response = await fetch('https://ipwhois.app/json/', { agent });
+        const primaryUrl = "https://ipwhois.app/json/";
+        const response = await fetch(primaryUrl, { agent });
         if (!response.ok) throw new Error(`Geo-location request failed with status ${response.status}`);
         const data = await response.json();
         return {
@@ -89,36 +88,29 @@ async function getGeoLocation(agent) {
             location: `${data.city}, ${data.region}, ${data.country}`,
         };
     } catch (error) {
-        logger(`Geo-location error: ${error.message}`, "error");
-        return { ip: "0.0.0.0", location: "Unknown Location" };
+      try {
+        const backupUrl = "https://ipinfo.io/json"; // 备用 API
+        // 如果主服务失败，尝试备用服务
+        const response = await fetch(backupUrl, { agent });
+        if (!response.ok) throw new Error(`Backup Geo-location request failed with status ${response.status}`);
+        const data = await response.json();
+  
+        return {
+          ip: data.ip,
+          location: data.loc || `${data.city}, ${data.region}, ${data.country}`,
+        };
+      } catch (backupError) {
+        console.error("Backup service failed:", backupError.message);
+  
+        // 返回默认值或抛出错误
+        return {
+          ip: "Unknown",
+          location: "Unknown",
+        };
+      }
     }
 }
 
-// Function to check for rewards and notify the user
-async function checkForRewards(baseUrl, token) {
 
-    try {
-        const response = await fetch(`${baseUrl}/api/rewards`, {
-            headers: {
-                ...headers,
-                "content-type": "application/json",
-                "authorization": `Bearer ${token}`,
-            }, agent,
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            if (Object.keys(data).length > 0) {
-                logger(`Earn more rewards points! Visit: ${data.link}`, 'info', data.link);
-            } else {
-                logger("No rewards available at the moment.");
-            }
-        } else {
-            logger("Failed to fetch rewards data.", 'warn');
-        }
-    } catch (error) {
-        logger("Error checking for rewards:", 'error');
-    }
-}
 
 module.exports = { sendHeartbeat };

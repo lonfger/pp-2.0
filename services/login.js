@@ -1,10 +1,12 @@
 const fetch = require("node-fetch");
-const { saveToken, headers, loadProxies } = require("../utils/file");
+const { saveToken, loadProxies, headers, generateRandomHeaders } = require("../utils/file");
 const { HttpsProxyAgent } = require("https-proxy-agent");
 const { logger } = require("../utils/logger");
 const fs = require('fs');
+const path = require("path");
 
-const ACCOUNT_FILE = 'account.json';
+const ACCOUNT_FILE = path.resolve(__dirname,  '../config/account.json');
+const email_path = path.resolve(__dirname,  '../config/email.txt') 
 
 // Function to read all accounts from account.json
 async function readUsersFromFile() {
@@ -17,16 +19,32 @@ async function readUsersFromFile() {
     }
 }
 
+// Function to read all accounts from account.json
+async function formatEmailToAccount() {
+  try {
+    return (await fs.promises.readFile(email_path, 'utf8'))
+      .split('\n')
+      .map((item) => {
+        const [email, password] = item.split(':')
+        return { email, password }
+      })
+  } catch (error) {
+    logger('Error reading users from file', 'error', error)
+    return []
+  }
+}
+
+
 // Login function with proxy and added headers
 async function login(email, password, API_BASE, proxy) {
     try {
         const agent = new HttpsProxyAgent(proxy);
+        const headers = generateRandomHeaders()
 
         const response = await fetch(`${API_BASE}/api/login`, {
             method: "POST",
             headers: {
                 ...headers,
-                "content-type": "application/json",
             },
             body: JSON.stringify({ email, password }),
             agent,
@@ -35,7 +53,8 @@ async function login(email, password, API_BASE, proxy) {
         if (response.ok) {
             const data = await response.json();
             if (data.token) {
-                await saveToken({ token: data.token, username: email });
+              //////////////////////////修改/////////////////////////////////////////////////// 
+                await saveToken({ token: data.token, username: email, headers: JSON.stringify(headers) });
                 logger(`Login successful for ${email}!`, 'success');
             } else {
                 logger(`Login failed for ${email}! No token returned.`, 'error');
@@ -54,7 +73,8 @@ async function login(email, password, API_BASE, proxy) {
 // Function to login with all accounts and use proxies
 async function loginWithAllAccounts(API_BASE) {
     const proxies = await loadProxies();
-    const accounts = await readUsersFromFile();
+    ////////////////////////// 修改 ////////////////////////////////////////////
+    const accounts = await formatEmailToAccount() 
 
     if (proxies.length === 0) {
         logger("No proxies available. Please check your proxy.txt file.", "error");

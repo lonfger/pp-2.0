@@ -1,6 +1,9 @@
 const fs = require("fs").promises;
 const { logger } = require("./logger");
-const TOKEN_FILE = "tokenz.json";
+const path = require("path");
+
+const TOKEN_FILE = path.resolve(__dirname,  '../config/tokenz.json') 
+const proxyPath = path.resolve(__dirname,  '../config/proxy.txt') 
 
 // Function to save the token
 async function saveToken(data) {
@@ -45,7 +48,7 @@ async function readToken() {
 
 async function loadProxies() {
     try {
-        const data = await fs.readFile('proxy.txt', 'utf8');
+        const data = await fs.readFile(proxyPath, 'utf8');
         return data.split('\n').filter(proxy => proxy.trim() !== '');
     } catch (error) {
         logger('Error reading proxy file:', "error", error);
@@ -53,17 +56,30 @@ async function loadProxies() {
     }
 }
 
-const headers = {
+function generateRandomHeaders() {
+  const randomVersion = () => (Math.floor(Math.random() * 50) + 100).toString();
+  const randomPriority = () => Math.random().toFixed(1);
+
+  // 随机选择平台并生成对应的 User-Agent
+  const isWindows = Math.random() < 0.5; // 50% 概率选择 Windows 或 Mac
+  const userAgent = isWindows
+    ? `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${randomVersion()}.0.0.0 Safari/537.36`
+    : `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${randomVersion()}.0.0.0 Safari/537.36`;
+
+  return {
     "accept": "*/*",
     "accept-encoding": "gzip, deflate, br, zstd",
     "accept-language": "en-US,en;q=0.9",
-    "priority": "u=1, i",
-    "sec-ch-ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+    "priority": `u=1, i; p=${randomPriority()}`, // 随机优先级
+    "sec-ch-ua": `"Google Chrome";v="${randomVersion()}", "Chromium";v="${randomVersion()}", "Not_A Brand";v="${Math.floor(Math.random() * 30)}"`,
     "sec-ch-ua-mobile": "?0",
-    "sec-ch-ua-platform": '"Windows"',
+    "sec-ch-ua-platform": isWindows ? '"Windows"' : '"Mac OS"', // 与 User-Agent 平台一致
     "sec-fetch-dest": "empty",
     "sec-fetch-mode": "cors",
     "sec-fetch-site": "none",
-    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "user-agent": userAgent,
+    'content-type': 'application/json',
+  };
 }
-module.exports = { saveToken, readToken, loadProxies, headers };
+
+module.exports = { saveToken, readToken, loadProxies, generateRandomHeaders };

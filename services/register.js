@@ -3,24 +3,24 @@ const fs = require('fs');
 const readlineSync = require('readline-sync');
 const { HttpsProxyAgent } = require("https-proxy-agent");
 const { logger } = require("../utils/logger");
-const { loadProxies, headers } = require("../utils/file");
+const { loadProxies,  generateRandomHeaders } = require("../utils/file");
 
 const ACCOUNT_FILE = 'account.json';
 
 // Function to register a new user with a specific proxy
 async function registerUser(email, password, proxy, API_URL) {
     try {
+        const headers = generateRandomHeaders()
         const agent = new HttpsProxyAgent(proxy);
         const response = await fetch(`${API_URL}/api/signup`, {
             method: 'POST',
             headers: {
                 ...headers,
-                'content-type': 'application/json',
             },
             body: JSON.stringify({
                 email: email,
                 password: password,
-                referralCode: "bml1YWdyb0",
+                referralCode: "",
             }),
             agent,
         });
@@ -29,7 +29,7 @@ async function registerUser(email, password, proxy, API_URL) {
             const data = await response.text();
             if (data) {
                 // Add user to the account.json 
-                await addUserToFile(email, password);
+                await addUserToFile(email, password, JSON.stringify(headers));
                 logger('Registration successful!', "success", data);
             } else {
                 logger('Registration failed! Please try again.', "error");
@@ -53,11 +53,11 @@ function promptUserForCredentials() {
 }
 
 // Function to add the new user to the array in account.json
-async function addUserToFile(email, password) {
+async function addUserToFile(email, password, headers) {
     try {
         let fileData = await fs.promises.readFile(ACCOUNT_FILE, 'utf8');
         let users = fileData ? JSON.parse(fileData) : [];
-        users.push({ email, password });
+        users.push({ email, password, headers });
 
         await fs.promises.writeFile(ACCOUNT_FILE, JSON.stringify(users, null, 2));
         logger('User added successfully to file!');
