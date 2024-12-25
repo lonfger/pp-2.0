@@ -1,5 +1,5 @@
 const fetch = require("node-fetch");
-const { saveToken, loadProxies, headers, generateRandomHeaders } = require("../utils/file");
+const { saveToken, loadProxies, headers, generateRandomHeaders, readToken } = require("../utils/file");
 const { HttpsProxyAgent } = require("https-proxy-agent");
 const { logger } = require("../utils/logger");
 const fs = require('fs');
@@ -75,17 +75,21 @@ async function loginWithAllAccounts(API_BASE) {
     const proxies = await loadProxies();
     ////////////////////////// 修改 ////////////////////////////////////////////
     const accounts = await formatEmailToAccount() 
+    const tokens = await readToken()
+
 
     if (proxies.length === 0) {
         logger("No proxies available. Please check your proxy.txt file.", "error");
         return;
     }
-
     for (let i = 0; i < accounts.length; i++) {
         const account = accounts[i];
         const proxy = proxies[i % proxies.length];
         logger(`Attempting to login with ${account.email} using proxy ${proxy}`);
-        await login(account.email, account.password, API_BASE, proxy);
+        
+        if (!tokens.filter(item => item.username === account.email).length) {
+          await login(account.email, account.password, API_BASE, proxy);
+        }
     }
     logger('All accounts logged in successfully!');
     return;
