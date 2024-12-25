@@ -5,15 +5,12 @@ const { logger } = require("../utils/logger");
 
 // Function to fetch the base URL
 async function fetchBaseUrl(fallbackUrl) {
-  const proxies = await loadProxies()
-  const agent = new HttpsProxyAgent(proxies[Math.floor(Math.random() * proxies.length)])
   logger('Fetching base URL...');
     try {
         const response = await fetchWithRetry('https://pipe-network-backend.pipecanary.workers.dev/api/getBaseUrl', {
           method: 'GET',
           rejectUnauthorized: false,
           secureProxy: false,
-          agent,
         });
         if (!response.ok) throw new Error(`Failed to fetch base URL with status ${response.status}`);
         const data = await response.json();
@@ -26,11 +23,13 @@ async function fetchBaseUrl(fallbackUrl) {
 }
 
 // Function to fetch a URL with retry logic
-async function fetchWithRetry(url, options = {}, retries = 3, delay = 1000) {
+async function fetchWithRetry(url, options = {}, retries = 10, delay = 1000) {
     logger(`Fetching URL with retry logic: ${url}`);
     for (let attempt = 0; attempt < retries; attempt++) {
         try {
-            const response = await fetch(url, options);
+            const proxies = await loadProxies()
+            const agent = new HttpsProxyAgent(proxies[Math.floor(Math.random() * proxies.length)])
+            const response = await fetch(url, {...options, agent});
             if (!response.ok) throw new Error(`Request failed with status ${response.status}`);
             logger(`Request to ${url} succeeded on attempt ${attempt + 1}`);
             return response;
