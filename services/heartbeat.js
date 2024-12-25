@@ -67,7 +67,7 @@ async function sendHeartbeat(API_BASE) {
                 await fetchPoints(token, username, agent, API_BASE, JSON.parse(headers));
             } else {
                 const errorText = await response.text();
-                logger(`Failed to send heartbeat for ${username}: ${errorText}`, "error");
+                logger(`Failed to send heartbeat for ${username}: ${errorText}： ${proxy}`, "error");
                 await fetchPoints(token, username, agent, API_BASE, JSON.parse(headers));
             }
         } catch (error) {

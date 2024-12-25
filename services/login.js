@@ -63,10 +63,10 @@ async function login(email, password, API_BASE, proxy) {
             logger(`Invalid credentials for ${email}. Please check your email and password.`, 'error');
         } else {
             const errorText = await response.text();
-            logger(`Login error for ${email}: ${errorText}`, 'error');
+            logger(`Login error for ${email}: ${errorText} ${proxy}`, 'error');
         }
     } catch (error) {
-        logger(`Error logging in with ${email}:`, 'error', error);
+        logger(`Error logging in with  ${proxy} ${email}:`, 'error', error);
     }
 }
 
